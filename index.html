@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pixel Beacon: take it home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{--bg:#05060f;--panel:#0d1024;--line:#2a3160;--ink:#eef0ff;--muted:#9aa3d6;--gold:#f2b544;--ok:#5ff0c9}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:17px/1.5 "Atkinson Hyperlegible",system-ui,sans-serif;padding:24px max(16px,env(safe-area-inset-left)) 40px max(16px,env(safe-area-inset-right))}
+main{max-width:460px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{font:700 22px/1.2 Silkscreen,monospace;margin:0;text-align:center;color:var(--gold);letter-spacing:.02em}
+p{margin:0}
+.muted{color:var(--muted);font-size:15px}
+.poster{display:block;width:100%;height:auto;border:2px solid var(--line);border-radius:6px;background:#000}
+.btns{display:grid;gap:12px}
+a.btn{display:block;text-align:center;text-decoration:none;font:700 18px/1.2 "Atkinson Hyperlegible",system-ui,sans-serif;padding:16px;border-radius:10px;background:var(--gold);color:#1a1200}
+a.btn.alt{background:var(--panel);color:var(--ink);border:2px solid var(--line)}
+a.btn:focus-visible,audio:focus-visible{outline:3px solid var(--ok);outline-offset:3px}
+audio{width:100%}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.card h2{font:700 13px/1 Silkscreen,monospace;margin:0;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.err{text-align:center;padding:40px 0}
+</style>
+</head>
+<body>
+<main id="app">
+  <h1>Pixel Beacon</h1>
+  <p class="muted" id="msg" style="text-align:center">Building your poster and sound…</p>
+</main>
+<script>
+(function(){
+const COLORS=[null,'#f4f4f4','#b13bd1','#3fcf4a','#3a7cf0','#ff4a3d','#ffd60a'];
+const HI=1320,LO=880,B64='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+const $=id=>document.getElementById(id);
+const fmt=n=>n.toLocaleString('en-US');
+function factor(n){const f=[];let d=2;while(n>1&&d*d<=n){while(n%d===0){f.push(d);n/=d}d++}if(n>1)f.push(n);return f}
+function unpackRaw(s,len){const g=new Uint8Array(len);let acc=0,n=0,i=0;for(const ch of s){const v=B64.indexOf(ch);if(v<0)throw 0;acc=(acc<<6)|v;n+=6;while(n>=3&&i<len){n-=3;const c=(acc>>n)&7;if(c>6)throw 0;g[i++]=c}acc&=(1<<n)-1}if(i<len)throw 0;return g}
+function unpackRle(s,len){const g=new Uint8Array(len);let i=0;for(const ch of s){const x=B64.indexOf(ch);if(x<0)throw 0;const v=x>>3,r=(x&7)+1;if(v>6||i+r>len)throw 0;g.fill(v,i,i+r);i+=r}if(i!==len)throw 0;return g}
+function txtDec(s){const o=[];for(let i=0;i<s.length;i+=4){const c=[0,1,2,3].map(j=>i+j<s.length?B64.indexOf(s[i+j]):0);if(c.some(x=>x<0))throw 0;const n=(c[0]<<18)|(c[1]<<12)|(c[2]<<6)|c[3],k=s.length-i;o.push(n>>16&255);if(k>2)o.push(n>>8&255);if(k>3)o.push(n&255)}return new TextDecoder().decode(new Uint8Array(o))}
+function fromToken(t){
+  const p=t.split('.');if(p[0]!=='pb1'||p.length<4)return null;
+  try{const[c,r]=p[1].split('x').map(Number);if(!(c>=3&&c<=40&&r>=3&&r<=80))return null;
+    const bps=[20,50,100,200].includes(parseInt(p[2]))?parseInt(p[2]):50,ook=p[2].endsWith('o');
+    const g=p[3][0]==='l'?unpackRle(p[3].slice(1),c*r):unpackRaw(p[3].slice(1),c*r);
+    return{cols:c,rows:r,grid:g,bps,ook,title:p[4]?txtDec(p[4]).slice(0,28):'',name:p[5]?txtDec(p[5]).slice(0,20):''}}catch(e){return null}
+}
+
+async function posterPNG(m){
+  try{await Promise.all(['700 34px Silkscreen','15px "IBM Plex Mono"'].map(f=>document.fonts.load(f)))}catch(e){}
+  const W=720,pad=48,s=Math.floor(Math.min((W-pad*2)/m.cols,760/m.rows)),aw=m.cols*s,ah=m.rows*s,H=pad+58+ah+90;
+  const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
+  g.fillStyle='#000';g.fillRect(0,0,W,H);g.strokeStyle='#333a6b';g.lineWidth=2;g.strokeRect(12,12,W-24,H-24);
+  g.fillStyle='#fff';g.textAlign='center';g.font='700 34px Silkscreen, monospace';g.fillText(m.name||m.title||'Pixel Beacon',W/2,pad+30,W-pad*2);
+  const ox=(W-aw)/2,oy=pad+58;
+  for(let i=0;i<m.grid.length;i++)if(m.grid[i]){g.fillStyle=COLORS[m.grid[i]];g.fillRect(ox+(i%m.cols)*s,oy+((i/m.cols)|0)*s,s,s)}
+  const N=m.cols*m.rows;g.fillStyle='#f2b544';g.font='15px "IBM Plex Mono", monospace';
+  g.fillText(`${fmt(N)} bits · ${factor(N).join(' × ')} · Pixel Beacon`,W/2,oy+ah+36);
+  return new Promise(r=>c.toBlob(r,'image/png'));
+}
+
+// the alien radio signal: one tone per pixel, 1 = 1320 Hz, 0 = 880 Hz (on/off beeps in OOK mode)
+function signalWAV(m){
+  const sr=22050,T=1/m.bps,bits=Array.from(m.grid,v=>v?1:0),lead=.2,tail=.25;
+  const n=Math.round((lead+bits.length*T+tail)*sr),pcm=new Int16Array(n);
+  let ph=0,env=0;
+  for(let i=0;i<n;i++){
+    const t=i/sr-lead,k=Math.floor(t/T),on=t>=0&&k<bits.length;
+    const bit=on?bits[k]:0,f=m.ook?HI:(bit?HI:LO),target=on?(m.ook?(bit?.32:0):.28):0;
+    env+=(target-env)*(m.ook?.02:.004);
+    ph+=2*Math.PI*f/sr;pcm[i]=Math.round(Math.sin(ph)*env*32767);
+  }
+  const buf=new ArrayBuffer(44+n*2),v=new DataView(buf),w=(o,s)=>[...s].forEach((c,j)=>v.setUint8(o+j,c.charCodeAt(0)));
+  w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);
+  new Int16Array(buf,44).set(pcm);
+  return new Blob([buf],{type:'audio/wav'});
+}
+
+function fail(t){$('app').innerHTML='<h1>Pixel Beacon</h1><p class="muted err">'+t+'</p>'}
+async function main(){
+  const token=decodeURIComponent(location.hash.slice(1));
+  if(!token)return fail('Scan the QR code next to your poster at the Pixel Beacon booth to open your picture and sound here.');
+  const m=fromToken(token);
+  if(!m)return fail('This code couldn’t be read. Ask the booth to show your QR code again.');
+  const png=await posterPNG(m),wav=signalWAV(m);
+  const pu=URL.createObjectURL(png),wu=URL.createObjectURL(wav),slug=(m.name||'message').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'message';
+  const secs=(m.grid.length/m.bps).toFixed(0);
+  $('app').innerHTML=
+    '<h1>Pixel Beacon</h1>'+
+    '<img class="poster" alt="Your pixel art poster" src="'+pu+'">'+
+    '<div class="btns"><a class="btn" id="dlPic" download="pixel-beacon-'+slug+'.png" href="'+pu+'">Download picture (PNG)</a>'+
+    '<a class="btn alt" id="dlSnd" download="pixel-beacon-'+slug+'-signal.wav" href="'+wu+'">Download sound (WAV)</a></div>'+
+    '<div class="card"><h2>Your alien signal</h2><audio controls src="'+wu+'" aria-label="Your alien radio signal"></audio>'+
+    '<p class="muted">'+fmt(m.grid.length)+' pulses, about '+secs+' seconds. A high beep is a 1, a low beep is a 0.</p></div>'+
+    '<p class="muted" style="text-align:center">If a button does nothing, press and hold the picture to save it.</p>';
+}
+main().catch(()=>fail('Something went wrong building your poster. Reload this page.'));
+})();
+</script>
+</body>
+</html>
