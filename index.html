@@ -49,6 +49,7 @@ function fromToken(t){
     return{cols:c,rows:r,grid:g,bps,ook,title:p[4]?txtDec(p[4]).slice(0,28):'',name:p[5]?txtDec(p[5]).slice(0,20):''}}catch(e){return null}
 }
 
+function footerLine(g,N,W,y,fmt,factor){const parts=[[`${fmt(N)} بت`,'rtl'],[' · ','rtl'],[factor(N).join(' × '),'ltr'],[' · ','rtl'],['منارة البكسل','rtl']];g.textAlign='right';const ws=parts.map(([t,d])=>{g.direction=d;return g.measureText(t).width});let x=W/2+ws.reduce((a,b)=>a+b,0)/2;parts.forEach(([t,d],i)=>{g.direction=d;g.fillText(t,x,y);x-=ws[i]});g.direction='rtl';g.textAlign='center'}
 async function posterPNG(m){
   try{await Promise.all(['700 34px Cairo','600 15px Cairo'].map(f=>document.fonts.load(f)))}catch(e){}
   const W=720,pad=48,s=Math.floor(Math.min((W-pad*2)/m.cols,760/m.rows)),aw=m.cols*s,ah=m.rows*s,H=pad+58+ah+90;
@@ -58,7 +59,7 @@ async function posterPNG(m){
   const ox=(W-aw)/2,oy=pad+58;
   for(let i=0;i<m.grid.length;i++)if(m.grid[i]){g.fillStyle=COLORS[m.grid[i]];g.fillRect(ox+(i%m.cols)*s,oy+((i/m.cols)|0)*s,s,s)}
   const N=m.cols*m.rows;g.fillStyle='#f2b544';g.font='600 15px Cairo, sans-serif';
-  g.fillText(`${fmt(N)} بت · ${'\u2066'+factor(N).join(' × ')+'\u2069'} · منارة البكسل`,W/2,oy+ah+36);
+  footerLine(g,N,W,oy+ah+36,fmt,factor);
   return new Promise(r=>c.toBlob(r,'image/png'));
 }
 
